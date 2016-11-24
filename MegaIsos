@@ -1,0 +1,33 @@
+#!/bin/bash
+if [ "$1" = "" ]; then
+        ISOSFOLDER=`date +%G%m%d`
+        ABSPATH="/srv/isos/${ISOSFOLDER}"
+else
+        ABSPATH=$1
+fi
+test -e $ABSPATH || { echo "La ruta no existe" ; exit 0; }
+megals --reload /Root/isos/ | tail -n +2 > allfiles
+while read line; do
+	FILETOREMOVE=$(megals --reload $line)
+        test "$FILETOREMOVE" = "" ||  megarm $line
+done < allfiles
+find $ABSPATH | tail -n +2 > filestopush
+while read line; do
+    NAME=`basename $line`
+	megaput --path /Root/isos/$NAME $line 1>/dev/null 2>/dev/null
+done < filestopush
+listlinks=$(mktemp)
+megals --reload -e /Root/isos | tail -n +2 > $listlinks
+llxrepositorymsg=$(mktemp)
+echo "Hola a todos, estas son las ultimas isos construidas desde XXX " > $llxrepositorymsg
+cat $listlinks | awk '
+  function basename(file) {
+    sub(".*/", "", file)
+    return file
+  }
+  {print basename($2) " " $1} ' >> $llxrepositorymsg
+rm allfiles
+rm filestopush
+rm listlinks
+llxrepositorybot $llxrepositorymsg
+rm $llxrepositorymsg
